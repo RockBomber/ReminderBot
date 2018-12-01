@@ -15,11 +15,11 @@ class ReminderBot(object):
         self.connection = None
         self.job_queue = None
         config = configparser.ConfigParser()
-        config.read(config_file_path)
-        config_main = config['main']
-        self.bot_token = config_main['bot_token']
-        self.proxy_url = config_main['proxy_url']
-        self.database = config_main['database']
+        with open(config_file_path) as config_file:
+            config.read_file(config_file)
+        self.bot_token = config.get('main', 'bot_token')
+        self.proxy_url = config.get('main', 'proxy_url')
+        self.database = config.get('main', 'database')
 
     def __enter__(self):
         self.init_database()
@@ -30,7 +30,7 @@ class ReminderBot(object):
         self.connection.close()
 
     def _callback_send_message(self, bot, job):
-        """Отпавляет сообщение и помечает в БД как отправленное"""
+        """Отправляет сообщение и помечает в БД как отправленное"""
         job_id, chat_id, text = job.context
         bot.send_message(chat_id=chat_id, text=text)
         cursor = self.connection.cursor()
@@ -95,8 +95,12 @@ class ReminderBot(object):
         request_kwargs = {
             'proxy_url': self.proxy_url,
             # Optional, if you need authentication:
-            # 'username': 'PROXY_USER',
-            # 'password': 'PROXY_PASS',
+            # urllib3_proxy_kwargs (dict) – Arbitrary arguments passed as-is to urllib3.ProxyManager.
+            # This value will be ignored if proxy_url is not set.
+            # 'urllib3_proxy_kwargs': {
+            #     'username': 'PROXY_USER',
+            #     'password': 'PROXY_PASS',
+            # }
         }
         updater = Updater(token=self.bot_token, request_kwargs=request_kwargs)
         dispatcher = updater.dispatcher
@@ -122,6 +126,5 @@ def main(config_file_path):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                        level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
     main('config.ini')

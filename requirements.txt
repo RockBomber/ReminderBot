@@ -1,2 +1,2 @@
 dateparser>=0.7.0
-python-telegram-bot>=11.1
+python-telegram-bot[socks]>=11.1
