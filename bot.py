@@ -19,7 +19,15 @@ class ReminderBot(object):
         config_main = config['main']
         self.bot_token = config_main['bot_token']
         self.proxy_url = config_main['proxy_url']
-        self.init_database(config_main['database'])
+        self.database = config_main['database']
+
+    def __enter__(self):
+        self.init_database()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        logging.info('Отключение от базы данных')
+        self.connection.close()
 
     def _callback_send_message(self, bot, job):
         """Отпавляет сообщение и помечает в БД как отправленное"""
@@ -63,8 +71,10 @@ class ReminderBot(object):
                          text='Напоминание будет выведено {}'.format(last_line))
         self._add_message(timestamp, update.message.chat_id, text)
 
-    def init_database(self, database):
-        self.connection = sqlite3.connect(database,
+    def init_database(self):
+        """Инициализцая БД. Создает таблицы, если ещё не созданы"""
+        logging.info('Соединение с базой данных')
+        self.connection = sqlite3.connect(self.database,
                                           check_same_thread=False,
                                           detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
         self.connection.execute('''
@@ -79,6 +89,8 @@ class ReminderBot(object):
         self.connection.commit()
 
     def start_bot(self):
+        """Запускает бота. Вызывает функция загрузки неотправленных сообщений из БД"""
+        logging.info('Запуск бота...')
         # Прокси с сайта http://spys.one/
         request_kwargs = {
             'proxy_url': self.proxy_url,
@@ -93,8 +105,11 @@ class ReminderBot(object):
         dispatcher.add_handler(receive_handler)
         updater.start_polling()
         self._load_jobs()
+        logging.info('Бот запущен')
+        updater.idle()
 
     def _load_jobs(self):
+        """Загружает неотправленные сообщения из БД в очередь на отправку"""
         cursor = self.connection.cursor()
         cursor.execute('select id, chat_id, ordervalue, text from messages where sent=false order by ordervalue')
         for job_id, chat_id, ordervalue, text in cursor:
@@ -102,8 +117,8 @@ class ReminderBot(object):
 
 
 def main(config_file_path):
-    bot = ReminderBot(config_file_path)
-    bot.start_bot()
+    with ReminderBot(config_file_path) as bot:
+        bot.start_bot()
 
 
 if __name__ == '__main__':
