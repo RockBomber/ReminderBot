@@ -81,6 +81,7 @@ class ReminderBot(object):
         create table if not exists messages (
           id integer primary key autoincrement,
           chat_id bigint not null,
+          creation_date timestamp default current_timestamp,
           ordervalue timestamp not null,
           text text not null,
           sent boolean not null
